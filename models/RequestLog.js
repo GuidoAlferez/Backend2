@@ -1,9 +1,10 @@
-const mongoose = require ("mongoose");
+const mongoose = require('mongoose');
 
-const requestLogSchema = new mongoose.Schema({
-    fecha:String,
-    textoDeBusqueda:String,
-    ip:String,
-    responseFrom:String
-});
-module.exports = mongoose.model('RequestLog',requestLogSchema); 
+const requestSchema= new mongoose.Schema({
+  date: String,
+  search: String,
+  ip:String,
+  responseFrom:String
+})
+ const requestModel = mongoose.model('logs', requestSchema);
+ module.exports = requestModel

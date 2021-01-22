@@ -1,63 +1,68 @@
-const fetch = require ('node-fetch')
-const mongoose = require('mongoose');
-const RequestLog = require('./Models/RequestLog');
+const connectionString = "mongodb+srv://alferezguido:1546@cluster0.fwzhw.mongodb.net/request-logs?retryWrites=true&w=majority";
+const PORT = "3200";
 const express = require('express');
-
-const app = express ();
-app.use(express.json())
-
-let ip="";
-let textoDeBusqueda="";
-
-app.get('/search/shows/:textoDeBusqueda',(req,res)=>{
-    textoDeBusqueda= req.params.textoDeBusqueda;
-
-    //Cuando recibamos un nuevo request desde el frontend, revisar primero si podemosresponder desde nuestro Mongo.
-    // Si tenemos una respuesta posible, enviar eseobjeto al frontend. Si no la tenemos, realizar el request a TVMaze.
-    
-    fetch(`http://api.tvmaze.com/singlesearch/shows?q=${textoDeBusqueda}`) //realizo peticion a tvmaze
-    .then(res => res.json())
-    .then(resultado => {
-        res.status(200).send({resultado});
-        console.log("La busqueda es: ");
-        console.log(resultado);
-    })
-    .catch( error => {
-        res.status(404).send({message:"La serie no fue encontrada"});
-        console.log(`No se encontro la serie: ${req.params.textoDeBusqueda}`);
-        console.log("ERROR: ", error);
-    })
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const fetch = require('node-fetch')
+const RequestLog = require('./Models/RequestLog')
+const SerieSearch = require('./Models/SerieSearch')
+const app = express();
+app.use(bodyParser.json());
+app.use(cors());
+app.get('/', (req, res) => {
+    res.status(200).send({ mensaje: "Funciona" })
 })
-
-app.post('/search/shows/ip',(req,res)=>{ //recibo la ip
-    ip= req.body.ip;
-    console.log("la IP recibida desde el FrontEnd:", ip)
-    res.status(200).send({ip});
-    //armo el objeto para luego guardarlo en la base de datos
-
-//En la colección "requestLogs", agregar un atributo al objeto "responseFrom" condos opciones "CACHE|API", completar segun corresponda.
-
-    let log = new RequestLog({
-        fecha: new Date(),
-        textoDeBusqueda:textoDeBusqueda,
-        ip:ip,
-        responseFrom:"CACHE|API"
-    })
-    
-    log.save().then(function(logCreated){
-        console.log("Fue guardada en la Base de Datos:")
-        console.log(logCreated);
-    })
-})
-
-mongoose.connect(
-    'mongodb+srv://alferezguido:1546@cluster0.fwzhw.mongodb.net/code_challenge?retryWrites=true&w=majority', function(err){
-    if(err){
-        console.log("ERROR EN LA CONEXION");
-    }else{            
-        app.listen('3200',(err)=>{
-            console.log("Server Up & Running")
+app.set('trus proxy', true)
+//GET Serie
+app.get('/:serie', (req, res) => {
+    SerieSearch.findOne({name : req.params.serie})
+        .then((SerieFinded)=>{
+            if(SerieFinded){
+                res.status(200).send(SerieFinded)
+                const newRequest = new RequestLog({
+                    date: new Date(),
+                    search: req.params.serie,
+                    ip: req.header('x-forwarded-for') || req.connection.remoteAddress,
+                    responseFrom: "CACHE"
+                })
+            }else{
+                fetch(`http://api.tvmaze.com/singlesearch/shows?q=${req.params.serie}`)
+                .then((res)=>{return res.json()})
+                .then((json)=>{
+                    if(!json){return res.status(404).send({"Not Founded":"404 Serie Not Founded"})}
+                    else{
+                        res.status(200).send(json)
+                        const newSerie = new SerieSearch({
+                            name:json.name,
+                            image:{medium:json.image.medium},
+                            summary:json.summary,
+                            officialSite:json.officialSite
+                           })
+                           newSerie.save().then((serieSaved)=>{
+                               return console.log(serieSaved)
+                            }).catch(err=>{ return console.log({"Error guardando serie":err})})
+                            const newRequest = new RequestLog({
+                                date: new Date(),
+                                search: req.params.serie,
+                                ip: req.header('x-forwarded-for') || req.connection.remoteAddress,
+                                responseFrom:"API"
+                            })
+                            newRequest.save().then((requestSaved) => {
+                                console.log(requestSaved)
+                            }).catch(err => { return console.log({ "Error": err }) })
+                    }
+                })
+            }
         })
-        console.log("Conexion exitosa a la base de datos");
+})
+mongoose.connect(connectionString, ((err) => {
+    if (err) {
+        console.log(err)
+    } else {
+        console.log("Conexion con base de datos establecida")
+        app.listen(PORT, (() => {
+            console.log("Server Express Listening")
+        }))
     }
-});
+}))
