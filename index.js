@@ -1,25 +1,29 @@
-const connectionString = "mongodb+srv://alferezguido:1546@cluster0.fwzhw.mongodb.net/request-logs?retryWrites=true&w=majority";
+const URL_DB = require("./Models/config")
 const PORT = "3200";
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const fetch = require('node-fetch')
+
+//-------------------------------------------------------------------------------->
 const RequestLog = require('./Models/RequestLog')
-const SerieSearch = require('./Models/SerieSearch')
+const SerieBuscada = require('./Models/SerieBuscada')
 const app = express();
+
 app.use(bodyParser.json());
 app.use(cors());
 app.get('/', (req, res) => {
-    res.status(200).send({ mensaje: "Funciona" })
+    res.status(200).send({ mensaje: "Bienvenido" })
 })
-app.set('trus proxy', true)
+app.set('true proxy', true)
+
 //GET Serie
 app.get('/:serie', (req, res) => {
-    SerieSearch.findOne({name : req.params.serie})
-        .then((SerieFinded)=>{
-            if(SerieFinded){
-                res.status(200).send(SerieFinded)
+    SerieBuscada.findOne({name : req.params.serie})
+        .then((SerieX)=>{
+            if(SerieX){
+                res.status(200).send(SerieX)
                 const newRequest = new RequestLog({
                     date: new Date(),
                     search: req.params.serie,
@@ -27,13 +31,13 @@ app.get('/:serie', (req, res) => {
                     responseFrom: "CACHE"
                 })
             }else{
-                fetch(`http://api.tvmaze.com/singlesearch/shows?q=${req.params.serie}`)
+                fetch(`${URL_DB}${req.params.serie}`)
                 .then((res)=>{return res.json()})
                 .then((json)=>{
                     if(!json){return res.status(404).send({"Not Founded":"404 Serie Not Founded"})}
                     else{
                         res.status(200).send(json)
-                        const newSerie = new SerieSearch({
+                        const newSerie = new SerieBuscada({
                             name:json.name,
                             image:{medium:json.image.medium},
                             summary:json.summary,
@@ -56,11 +60,12 @@ app.get('/:serie', (req, res) => {
             }
         })
 })
+
 mongoose.connect(connectionString, ((err) => {
     if (err) {
         console.log(err)
     } else {
-        console.log("Conexion con base de datos establecida")
+        console.log("Database conected")
         app.listen(PORT, (() => {
             console.log("Server Express Listening")
         }))
