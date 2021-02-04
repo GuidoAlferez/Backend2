@@ -31,7 +31,7 @@ app.get('/:serie', (req, res) => {
             responseFrom: "CACHE"
             })
         }else{
-            fetch(`${URL_DB}${req.params.serie}`)
+            fetch(`http://api.tvmaze.com/singlesearch/shows?q=${req.params.serie}`)
             .then((res)=>{return res.json()})
             .then((json)=>{
                 if(!json){return res.status(404).send({"Not Founded":"404 Serie Not Founded"})}
@@ -61,7 +61,7 @@ app.get('/:serie', (req, res) => {
     })
 })
 
-mongoose.connect(connectionString, ((err) => {
+mongoose.connect(URL_DB, ((err) => {
     if (err) {
         console.log(err)
     } else {
